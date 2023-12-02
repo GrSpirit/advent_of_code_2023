@@ -24,6 +24,14 @@ fn power(cubes: &[u32; 3]) -> u32 {
     cubes.iter().product()
 }
 
+fn game_power(game: &[[u32; 3]]) -> u32 {
+    let max_cubes = game.iter().fold([0u32; 3], |mut acc, g| {
+        g.iter().enumerate().for_each(|(i, x)| acc[i] = acc[i].max(*x));
+        acc
+    });
+    power(&max_cubes)
+}
+
 fn parse_line(line: &str) -> Result<(u32, Vec<[u32; 3]>)> {
     let (game_number, sets) = line.split_once(':').ok_or(Error::ParseError)?;
     let n = game_number.trim().split_ascii_whitespace().last().and_then(|s| s.parse::<u32>().ok()).ok_or(Error::ParseError)?;
@@ -57,11 +65,7 @@ pub fn task2<S: AsRef<str>>(lines: &[S]) -> Result<u32> {
     .try_fold(0, |acc, res| {
         match res {
             Ok((_, game)) => {
-                let score = game.iter().fold([0u32; 3], |mut acc, g| {
-                    g.iter().enumerate().for_each(|(i, x)| acc[i] = acc[i].max(*x));
-                    acc
-                });
-                Ok(acc + power(&score))
+                Ok(acc + game_power(&game))
             },
             Err(err) => Err(err)
         }
@@ -93,5 +97,16 @@ mod tests {
     fn test_validate() {
         assert!(is_valid_game(&[12, 13, 14]));
         assert!(!is_valid_game(&[2, 3, 16]));
+    }
+
+    #[test]
+    fn test_power() {
+        assert_eq!(24, power(&[2, 3, 4]));
+    }
+
+    #[test]
+    fn test_game_power() {
+        assert_eq!(30, game_power(&[[1, 1, 2], [5, 1, 2], [1, 3, 1]]));
+        assert_eq!(27, game_power(&[[1, 1, 1], [2, 2, 2], [3, 3, 3]]));
     }
 }
