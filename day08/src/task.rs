@@ -40,7 +40,6 @@ pub fn task1<S: AsRef<str>>(lines: &[S]) -> Result<u32> {
 fn find_cycle(start: &str, instructions: &str, map: &HashMap<String, (String, String)>) -> Result<u64> {
     let mut key = start;
     let mut count = 0;
-    // let mut ends = Vec::new();
     for dir in instructions.chars().cycle() {
         key = match dir {
             'L' => &map.get(key).ok_or(Error::WrongNode)?.0,
@@ -51,9 +50,6 @@ fn find_cycle(start: &str, instructions: &str, map: &HashMap<String, (String, St
         if key.ends_with('Z') {
             return Ok(count);
         }
-        // if key == start {
-        //     return Ok((count, ends));
-        // }
     }
     unreachable!()
 }
