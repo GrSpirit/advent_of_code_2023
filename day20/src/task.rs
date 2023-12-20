@@ -18,6 +18,26 @@ enum RelayType {
     Dummy,
 }
 
+impl RelayType {
+    fn process(&mut self, input_name: &str, input_signal: bool) -> Option<bool> {
+        match self {
+            RelayType::Broadcaster => Some(false),
+            RelayType::FlipFlop(state) => {
+                if input_signal { return None; }
+                *state = !*state;
+                Some(*state)
+            },
+            RelayType::Conjunction(input) => {
+                *input.get_mut(input_name).unwrap() = input_signal;
+                Some(!input.values().all(|v| *v))
+            },
+            RelayType::Dummy => {
+                None
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Module {
     name: String,
@@ -52,42 +72,36 @@ fn fill_inputs(relays: &mut HashMap<String, Module>) {
     }
 }
 
-pub fn task1<S: AsRef<str>>(lines: &[S]) -> Result<u64> {
-    let mut relays: HashMap<String, Module> = lines.iter().map(|s| s.as_ref().parse().unwrap()).map(|m: Module| (m.name.clone(), m)).collect();
-    fill_inputs(&mut relays);
+fn run<F: FnMut(&str, &str, bool)>(relays: &mut HashMap<String, Module>, mut f: F) {
     let mut q = VecDeque::new();
-    let mut low_count = 0;
-    let mut high_count = 0;
-    for _ in 0..1000 {
-        q.push_back(("broadcaster".to_owned(), String::from("button"), false));
-        low_count += 1;
-        while let Some((module_name, input_name, input_signal)) = q.pop_front() {
-            if let Some(module) = relays.get_mut(&module_name) {
-                let output_signal = match &mut module.relay_type {
-                    RelayType::Broadcaster => false,
-                    RelayType::FlipFlop(state) => {
-                        if input_signal { continue; }
-                        *state = !*state;
-                        *state
-                    },
-                    RelayType::Conjunction(input) => {
-                        *input.get_mut(&input_name).unwrap() = input_signal;
-                        !input.values().all(|v| *v)
-                    },
-                    RelayType::Dummy => {
-                        continue;
-                    }
-                };
+
+    q.push_back(("broadcaster".to_owned(), String::from("button"), false));
+    while let Some((module_name, input_name, input_signal)) = q.pop_front() {
+        if let Some(module) = relays.get_mut(&module_name) {
+            if let Some(output_signal) = module.relay_type.process(&input_name, input_signal) {
                 for target in &module.output {
-                    if output_signal {
-                        high_count += 1;
-                    } else {
-                        low_count += 1;
-                    }
+                    f(&module_name, target, output_signal);
                     q.push_back((target.clone(), module_name.clone(), output_signal))
                 }
             }
         }
+    }
+}
+
+pub fn task1<S: AsRef<str>>(lines: &[S]) -> Result<u64> {
+    let mut relays: HashMap<String, Module> = lines.iter().map(|s| s.as_ref().parse().unwrap()).map(|m: Module| (m.name.clone(), m)).collect();
+    fill_inputs(&mut relays);
+    let mut low_count = 0;
+    let mut high_count = 0;
+    for _ in 0..1000 {
+        low_count += 1;
+        run(&mut relays, |_, _, signal| {
+            if signal {
+                high_count += 1;
+            } else {
+                low_count += 1;
+            }
+        });
     }
     Ok(low_count * high_count)
 }
@@ -95,44 +109,22 @@ pub fn task1<S: AsRef<str>>(lines: &[S]) -> Result<u64> {
 pub fn task2<S: AsRef<str>>(lines: &[S]) -> Result<u64> {
     let mut relays: HashMap<String, Module> = lines.iter().map(|s| s.as_ref().parse().unwrap()).map(|m: Module| (m.name.clone(), m)).collect();
     fill_inputs(&mut relays);
-    let mut q = VecDeque::new();
     let mut count = 0;
     let mut seen = HashMap::new();
+    let mut stop = false;
     loop {
-        q.push_back(("broadcaster".to_owned(), String::from("button"), false));
         count += 1;
-        while let Some((module_name, input_name, input_signal)) = q.pop_front() {
-            if let Some(module) = relays.get_mut(&module_name) {
-                let output_signal = match &mut module.relay_type {
-                    RelayType::Broadcaster => false,
-                    RelayType::FlipFlop(state) => {
-                        if input_signal { continue; }
-                        *state = !*state;
-                        *state
-                    },
-                    RelayType::Conjunction(input) => {
-                        *input.get_mut(&input_name).unwrap() = input_signal;
-                        !input.values().all(|v| *v)
-                    },
-                    RelayType::Dummy => {
-                        continue;
-                    }
-                };
-                if output_signal && (module_name == "kk" || module_name == "xr" || module_name == "fv" || module_name == "vt") {
-                    seen.insert(module_name.clone(), count);
-                    if ["kk", "xr", "fv", "vt"].into_iter().all(|k| seen.contains_key(k)) {
-                        return Ok(seen.values().product());
-                    }
-                }
-                for target in &module.output {
-                    if !output_signal && target == "rx" {
-                        return Ok(count);
-                    }
-                    q.push_back((target.clone(), module_name.clone(), output_signal))
+        run(&mut relays, |output_name, input_name, signal| {
+            if input_name == "sq" && signal {
+                seen.insert(output_name.to_string(), count);
+                if ["kk", "xr", "fv", "vt"].into_iter().all(|k| seen.contains_key(k)) {
+                    stop = true;
                 }
             }
-        }
+        });
+        if stop { break; }
     }
+    Ok(seen.values().product())
     // 217317393039529
 }
 
